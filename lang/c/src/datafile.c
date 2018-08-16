@@ -525,7 +525,9 @@ int avro_file_reader_fp(FILE *fp, const char *path, int should_close,
 	r->current_blocklen = 0;
 
 	rval = file_read_block_count(r);
-	if (rval) {
+	if (rval == EOF) {
+		r->blocks_total = 0;
+	} else if (rval) {
 		avro_reader_free(r->reader);
 		avro_codec_reset(r->codec);
 		avro_freet(struct avro_codec_t_, r->codec);
@@ -534,7 +536,7 @@ int avro_file_reader_fp(FILE *fp, const char *path, int should_close,
 	}
 
 	*reader = r;
-	return rval;
+	return 0;
 }
 
 int avro_file_reader(const char *path, avro_file_reader_t * reader)
@@ -716,6 +718,12 @@ avro_file_reader_read_value(avro_file_reader_t r, avro_value_t *value)
 
 	check_param(EINVAL, r, "reader");
 	check_param(EINVAL, value, "value");
+
+	/* This will be set to zero when an empty file is opened.
+	 * Return EOF here when the user attempts to read. */
+	if (r->blocks_total == 0) {
+		return EOF;
+	}
 
 	if (r->blocks_read == r->blocks_total) {
 		/* reads sync bytes and buffers further bytes */
